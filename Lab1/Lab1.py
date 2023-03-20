@@ -76,6 +76,7 @@ class Layer:
         outputs: results compute by this layer
         """
         self.forward_grad = np.append(inputs, np.ones((inputs.shape[0], 1)), axis=1)
+
         if self.activation == 'sigmoid':
             self.output = self.sigmoid(np.matmul(self.forward_grad, self.weight))
         
@@ -194,7 +195,7 @@ class DNN:
         for layer in self.layers:
             layer.update()
     
-    def train(self, inputs, labels, threshold = 0.0005):
+    def train(self, inputs, labels):
         for epoch in range(self.epoch):
             predict = self.forward(inputs)
             
@@ -208,8 +209,7 @@ class DNN:
                 self.learning_epoch.append(epoch)
                 self.learning_loss.append(loss)
             
-            if loss < threshold:
-                break
+            
     
     def test(self, inputs, labels):
         prediction = self.forward(inputs)
