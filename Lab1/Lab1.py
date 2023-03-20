@@ -194,7 +194,7 @@ class DNN:
         for layer in self.layers:
             layer.update()
     
-    def train(self, inputs, labels):
+    def train(self, inputs, labels, threshold = 0.0005):
         for epoch in range(self.epoch):
             predict = self.forward(inputs)
             
@@ -204,17 +204,20 @@ class DNN:
             self.update()
     
             if epoch % 500 == 0:
-                print(f'Epoch {epoch} loss : {loss}')
+                print(f'Epoch {epoch:<5d}        loss : {loss}')
                 self.learning_epoch.append(epoch)
                 self.learning_loss.append(loss)
             
-            if loss < 0.005:
+            if loss < threshold:
                 break
     
     def test(self, inputs, labels):
         prediction = self.forward(inputs)
-        print(prediction)
-        print(f'Accuracy : {float(np.sum(np.round(prediction) == labels)) / len(labels)}')
+        loss = np.mean((prediction - labels) ** 2)
+        
+        for i, (gt, pred) in enumerate(zip(labels, inputs)):
+            print(f'Iter{i:<3d}  |  Ground Truth:  {gt[0]}  |   Prediction:  {pred[1]:.3f}')
+        print(f'Loss : {loss}   Accuracy : {float(np.sum(np.round(prediction) == labels)) * 100 / len(labels)}%')
         return np.round(prediction)
 
     def plot_lr_curve(self):
