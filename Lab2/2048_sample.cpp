@@ -464,7 +464,15 @@ public:
 	 */
 	virtual float estimate(const board& b) const {
 		// TODO
+		// Sum up the value of all isomorphic pattern
+		float value = 0;
+		for (int i = 0; i < iso_last; i++) {
+			size_t index = indexof(isomorphic[i], b);
+			// Look up the weight for each isomorphic pattern by index
+			value += operator[](index);
+		}
 
+		return value;
 	}
 
 	/**
@@ -472,7 +480,17 @@ public:
 	 */
 	virtual float update(const board& b, float u) {
 		// TODO
+		float u_avg = u / iso_last;
+		float value = 0;
 
+		// Update all isomorphic pattern with average TD-error
+		for (int i = 0; i < iso_last; i++) {
+			size_t index = indexof(isomorphic[i], b);
+			operator[](index) += u_avg;
+			value += operator[](index);
+		}
+		
+		return value;
 	}
 
 	/**
@@ -510,6 +528,14 @@ protected:
 
 	size_t indexof(const std::vector<int>& patt, const board& b) const {
 		// TODO
+		// Return b.at(patt[len - 1]) | b.at(patt[len - 2]) | ... | b.at(patt[1]) | b.at(patt[0])
+        // as an index for look up table
+		size_t index = 0;
+		for (size_t i = 0; i < patt.size(); i++) {
+			index |= b.at(patt[i]) << (4 * i);
+		}
+		
+		return index;
 	}
 
 	std::string nameof(const std::vector<int>& patt) const {
@@ -678,12 +704,42 @@ public:
 	state select_best_move(const board& b) const {
 		state after[4] = { 0, 1, 2, 3 }; // up, right, down, left
 		state* best = after;
+		float best_total = -std::numeric_limits<float>::max();
+		
 		for (state* move = after; move != after + 4; move++) {
 			if (move->assign(b)) {
 				// TODO
+				// Find empty tile
+				board after_state = move->after_state();
+				int space[16], num = 0;
+				for (int i = 0; i < 16; i++) {
+					if (after_state.at(i) == 0) {
+						space[num++] = i;
+					}
+				}
 
-				if (move->value() > best->value())
+				// Set value for before state
+				move->set_value(estimate(move->before_state()));
+
+				// Avg before state value: R + V(S')
+				float total = move->reward();
+				for (int i = 0; i < num; i++) {
+					board *tmp = new board(uint64_t(after_state));
+					// before state for new popup tile: 2
+					tmp->set(space[i], 1);
+					total += 0.9f * estimate(*tmp) / num;
+
+					// before state for new popup tile: 4
+					tmp->set(space[i], 2);
+					total += 0.1f * estimate(*tmp) / num;
+					
+					delete tmp;
+				}
+
+				if (total > best_total){
 					best = move;
+					best_total = total;
+				}
 			} else {
 				move->set_value(-std::numeric_limits<float>::max());
 			}
@@ -708,7 +764,12 @@ public:
 	 */
 	void update_episode(std::vector<state>& path, float alpha = 0.1) const {
 		// TODO
-
+		float exact = 0;
+		for (path.pop_back(); path.size(); path.pop_back()) {
+			state &move = path.back();
+			float TD_error = move.reward() + exact - move.value();
+			exact = move.reward() + update(move.before_state(), alpha * TD_error);
+		}
 	}
 
 	/**
@@ -822,13 +883,25 @@ private:
 	std::vector<int> maxtile;
 };
 
+void save_csv(std::vector<float> &scores, std::string path) {
+	std::ofstream file;
+    file.open(path);
+    file << "score\n";
+
+    for(float score: scores){
+        file << score <<'\n';
+    }
+
+    file.close();
+}
+
 int main(int argc, const char* argv[]) {
 	info << "TDL2048-Demo" << std::endl;
 	learning tdl;
 
 	// set the learning parameters
 	float alpha = 0.1;
-	size_t total = 100000;
+	size_t total = 150000;
 	unsigned seed;
 	__asm__ __volatile__ ("rdtsc" : "=a" (seed));
 	info << "alpha = " << alpha << std::endl;
@@ -841,12 +914,19 @@ int main(int argc, const char* argv[]) {
 	tdl.add_feature(new pattern({ 4, 5, 6, 7, 8, 9 }));
 	tdl.add_feature(new pattern({ 0, 1, 2, 4, 5, 6 }));
 	tdl.add_feature(new pattern({ 4, 5, 6, 8, 9, 10 }));
+	tdl.add_feature(new pattern({1, 4, 9, 14}));
+	tdl.add_feature(new pattern({0, 5, 8, 10}));
+	tdl.add_feature(new pattern({1, 6, 9, 11}));
+	tdl.add_feature(new pattern({1, 4, 5, 6, 9, 13}));
+	
 
 	// restore the model from file
 	tdl.load("");
 
 	// train the model
 	std::vector<state> path;
+	std::vector<float> scores;
+	float _score = 0;
 	path.reserve(20000);
 	for (size_t n = 1; n <= total; n++) {
 		board b;
@@ -875,10 +955,21 @@ int main(int argc, const char* argv[]) {
 		tdl.update_episode(path, alpha);
 		tdl.make_statistic(n, b, score);
 		path.clear();
+
+		// save score
+		_score += score;
+		if (n % 1000 == 0) {
+			scores.push_back(_score / 1000);
+			_score = 0;
+		}
+
 	}
 
 	// store the model into file
-	tdl.save("");
+	tdl.save("weights.bin");
+
+	// store the avg score to csv
+	save_csv(scores, "./scores.csv");
 
 	return 0;
 }
