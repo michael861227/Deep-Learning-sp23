@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.init as init
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -70,7 +71,7 @@ class BottleneckBlock(nn.Module):
         return out
 
 class ResNet(nn.Module):
-    def __init__(self, block, layers, num_classes = 5):
+    def __init__(self, block, layers, dropout = 0.25, num_classes = 5):
         super(ResNet, self).__init__()
         self.in_planes = 64
 
@@ -93,9 +94,17 @@ class ResNet(nn.Module):
             nn.Flatten(),
             nn.Linear(in_features = 512 * self.expansion, out_features = 100),
             nn.ReLU(inplace = True),
-            nn.Dropout(p = 0.25),
+            nn.Dropout(p = dropout),
             nn.Linear(in_features = 100, out_features = num_classes)
         )
+        
+        # Initialization
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                init.constant_(m.weight, 1)
+                init.constant_(m.bias, 0)
 
 
     def _make_layer(self, block, planes, num_blocks, stride = 1):

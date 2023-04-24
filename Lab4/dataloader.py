@@ -1,6 +1,11 @@
 import pandas as pd
 from torch.utils import data
 import numpy as np
+import os
+from torchvision import transforms
+from PIL import Image, ImageFile
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 def getData(mode):
@@ -27,6 +32,34 @@ class RetinopathyLoader(data.Dataset):
         self.root = root
         self.img_name, self.label = getData(mode)
         self.mode = mode
+        
+        transforms_set = [
+            transforms.RandomHorizontalFlip(p = 0.5),
+            transforms.RandomVerticalFlip(p = 0.5),
+        ]
+        
+        self.train_transforms = transforms.Compose([
+            transforms.Resize(512),
+            transforms.CenterCrop(512),
+            transforms.RandomOrder(transforms_set),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean = [0.485, 0.456, 0.406],
+                std = [0.229, 0.224, 0.225]
+            )
+        ])
+        
+        self.test_transforms = transforms.Compose([
+            transforms.Resize(512),
+            transforms.CenterCrop(512),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean = [0.485, 0.456, 0.406],
+                std = [0.229, 0.224, 0.225]
+            )
+        ])
+       
+        
         print("> Found %d images..." % (len(self.img_name)))
 
     def __len__(self):
@@ -53,5 +86,13 @@ class RetinopathyLoader(data.Dataset):
                          
             step4. Return processed image and label
         """
-
+        path = os.path.join(self.root, f'{self.img_name[index]}.jpeg')
+        
+        if self.mode == 'train':
+            img = self.train_transforms(Image.open(path))
+        else:
+            img = self.test_transforms(Image.open(path))
+        
+        label = self.label[index]
+        
         return img, label
