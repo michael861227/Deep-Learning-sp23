@@ -137,9 +137,6 @@ def train(model_name, model_dict, train_loader, test_loader, ground_truth, args,
         
         plot_confusion_matrix(model_name, model, model_state, args, ground_truth, test_loader, device)
         
-        with open('demo.txt', 'a') as f:
-            f.write(f'{model_name}_{model_state}: {best_testing_acc[model_state]:.2f}%' + '\n')
-        
         torch.cuda.empty_cache()
 
 def plot_confusion_matrix(model_name, model, model_state, args, ground_truth, test_loader, device):
@@ -203,9 +200,6 @@ def test(model_name, model_dict, test_loader, args, device):
             test_correct = test_correct / len(test_loader.dataset) * 100
             
             print(f'{model_name}_{model_state}: {test_correct:.2f}%')
-            
-            with open('demo.txt', 'a') as f:
-                f.write(f'{model_name}_{model_state}: {test_correct:.2f}%' + '\n')
                 
                 
 if __name__ == '__main__':
