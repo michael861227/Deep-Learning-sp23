@@ -1,10 +1,10 @@
 import torch
 import os
 import numpy as np
-import csv
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torchvision import transforms
-from PIL import Image
+import cv2
+
 
 default_transform = transforms.Compose([
     transforms.ToTensor(),
@@ -12,80 +12,64 @@ default_transform = transforms.Compose([
 
 class bair_robot_pushing_dataset(Dataset):
     def __init__(self, args, mode='train', transform=default_transform):
-        assert mode == 'train' or mode == 'test' or mode == 'validate'
-        self.root = '{}/{}'.format(args.data_root, mode)
-        self.seq_len = max(args.n_past + args.n_future, args.n_eval)
-        self.mode = mode
-        if mode == 'train':
-            self.ordered = False
-        else:
-            self.ordered = True
-        
-        self.transform = transform
-        self.dirs = []
-        for dir1 in os.listdir(self.root):
-            for dir2 in os.listdir(os.path.join(self.root, dir1)):
-                self.dirs.append(os.path.join(self.root, dir1, dir2))
-                
+
         self.seed_is_set = False
-        self.idx = 0
-        self.cur_dir = self.dirs[0]
-                
+        self.data_path = args.data_root
+        self.mode = mode 
+        self.seq_length = args.n_past + args.n_future
+
+        min, max = [0.42638585, -0.3080245 ,  0.19146784], [0.42850533, 0.54029283, 0.12564658]
+
+        self.videos = []
+        self.positions = []
+        self.actions = []
+        videos = os.listdir(self.data_path + mode + '/')
+        for vid in videos:
+            subvideos = os.listdir(self.data_path + mode + '/' + vid + '/')
+            for svid in subvideos:
+                self.videos.append(mode + '/' + vid + '/' + svid + '/')
+                pos = np.loadtxt(self.data_path + mode + '/' + vid + '/' + svid + '/endeffector_positions.csv', delimiter=',')
+                self.positions.append((pos-min)/max)
+                action = np.loadtxt(self.data_path + mode + '/' + vid + '/' + svid + '/actions.csv', delimiter=',')
+                self.actions.append(action)
+
+        self.length = len(self.videos)
+        self.positions = np.asarray(self.positions)
+        self.actions = np.asarray(self.actions)
+        self.transform = transform
+            
     def set_seed(self, seed):
         if not self.seed_is_set:
             self.seed_is_set = True
             np.random.seed(seed)
             
     def __len__(self):
-        return len(self.dirs)
-        
-    def get_seq(self):
-        if self.ordered:
-            self.cur_dir = self.dirs[self.d]
-            if self.idx == len(self.dirs) - 1:
-                self.idx = 0
-            else:
-                self.idx += 1
-        else:
-            self.cur_dir = self.dirs[np.random.randint(len(self.dirs))]
-            
-        image_seq = []
-        for i in range(self.seq_len):
-            fname = '{}/{}.png'.format(self.cur_dir, i)
-            img = Image.open(fname)
-            image_seq.append(self.transform(img))
-        image_seq = torch.stack(image_seq)
-
-        return image_seq
+        return self.length
     
-    def get_csv(self):
-        with open('{}/actions.csv'.format(self.cur_dir), newline='') as csvfile:
-            rows = csv.reader(csvfile)
-            actions = []
-            for i, row in enumerate(rows):
-                if i == self.seq_len:
-                    break
-                action = [float(value) for value in row]
-                actions.append(torch.tensor(action))
-            
-            actions = torch.stack(actions)
-            
-        with open('{}/endeffector_positions.csv'.format(self.cur_dir), newline='') as csvfile:
-            rows = csv.reader(csvfile)
-            positions = []
-            for i, row in enumerate(rows):
-                if i == self.seq_len:
-                    break
-                position = [float(value) for value in row]
-                positions.append(torch.tensor(position))
-            positions = torch.stack(positions)
+    def load_img(self, video, frame):
+        img = cv2.imread(self.data_path + video + f'/{frame}.png')
+        return self.transform((cv2.cvtColor(img, cv2.COLOR_BGR2RGB))/255.0)
+        
+    def get_seq(self, index):
+        video = self.videos[index]
 
-        condition = torch.cat((actions, positions), axis=1)
+        seq = torch.stack([self.load_img(video, i).to(torch.float32) for i in range(self.seq_length)], dim=0)
+        
+        return seq
 
-        return condition
+    
+    def get_csv(self, index):
+        # start = 0
+        position = self.positions[index, :self.seq_length]
+        action = self.actions[index, :self.seq_length]
+
+        condition = np.hstack((position, action))
+        
+        return torch.from_numpy(condition).to(torch.float32)
 
     def __getitem__(self, index):
         self.set_seed(index)
-        seq = self.get_seq()
-        cond =  self.get_csv()
+        seq = self.get_seq(index)
+        cond =  self.get_csv(index)
+
         return seq, cond
