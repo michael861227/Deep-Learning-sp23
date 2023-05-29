@@ -12,6 +12,7 @@ import gym
 import numpy as np
 import torch
 import torch.nn as nn
+import wandb
 from torch.utils.tensorboard import SummaryWriter
 from atari_wrappers import wrap_deepmind, make_atari
 
@@ -34,7 +35,7 @@ class ReplayMemory:
     def sample(self, batch_size, device):
         '''sample a batch of transition tensors'''
         transitions = random.sample(self.buffer, batch_size)
-        return (torch.tensor(x, dtype=torch.float, device=device)
+        return (torch.tensor(np.array(x), dtype=torch.float, device=device)
                 for x in zip(*transitions))
 
 
@@ -113,7 +114,7 @@ class DQN:
     def append(self, state, action, reward, next_state, done):
         ## TODO ##
         """Push a transition into replay buffer"""
-        self._memory.append(state, [action], [reward / 10], next_state, [int(done)])
+        self._memory.append(state, [action], [reward], next_state, [int(done)])
 
     def update(self, total_steps):
         if total_steps % self.freq == 0:
@@ -158,9 +159,9 @@ class DQN:
     def load(self, model_path, checkpoint=False):
         model = torch.load(model_path)
         self._behavior_net.load_state_dict(model['behavior_net'])
+        
         if checkpoint:
-            self._target_net.load_state_dict(model['target_net'])
-            self._optimizer.load_state_dict(model['optimizer'])
+            self._target_net.load_state_dict(model['behavior_net'])
 
 def train(args, agent, writer):
     print('Start Training')
@@ -190,7 +191,7 @@ def train(args, agent, writer):
 
             ## TODO ##
             # store transition
-            agent.append(np.array(state), action, reward, np.array(next_state), done)
+            agent.append(state, action, reward, next_state, done)
 
             if total_steps >= args.warmup:
                 agent.update(total_steps)
@@ -208,6 +209,7 @@ def train(args, agent, writer):
                 ewma_reward = 0.05 * total_reward + (1 - 0.05) * ewma_reward
                 writer.add_scalar('Train/Episode Reward', total_reward, episode)
                 writer.add_scalar('Train/Ewma Reward', ewma_reward, episode)
+                wandb.log({"Train/Episode Reward": total_reward, "Train/Ewma Reward": ewma_reward})
                 print('Step: {}\tEpisode: {}\tLength: {:3d}\tTotal reward: {:.2f}\tEwma reward: {:.2f}\tEpsilon: {:.3f}'
                         .format(total_steps, episode, t, total_reward, ewma_reward, epsilon))
                 break
@@ -224,6 +226,7 @@ def test(args, agent, writer):
     with open('test.txt', 'w') as f:
         for i in range(args.test_episode):
             state = env.reset()
+            state, reward, done, _ = env.step(1) # fire first !!!
             e_reward = 0
             done = False
 
@@ -241,17 +244,17 @@ def test(args, agent, writer):
         env.close()
         print('Average Reward: {:.2f}'.format(float(sum(e_rewards)) / float(args.test_episode)))
         f.write('Average Reward: {:.2f}\n'.format(float(sum(e_rewards)) / float(args.test_episode)))
-
+        wandb.log({"Average Reward": float(sum(e_rewards)) / float(args.test_episode)})
 
 def main():
     ## arguments ##
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-d', '--device', default='cuda')
-    parser.add_argument('-m', '--model', default='ckpt/dqn.pth')
+    parser.add_argument('-m', '--model', default='dqn.pth')
     parser.add_argument('--logdir', default='log/dqn')
     # train
     parser.add_argument('--warmup', default=20000, type=int)
-    parser.add_argument('--episode', default=25000, type=int)
+    parser.add_argument('--episode', default=60000, type=int)
     parser.add_argument('--capacity', default=100000, type=int)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--lr', default=0.0000625, type=float)
@@ -263,11 +266,12 @@ def main():
     parser.add_argument('--eval_freq', default=100000, type=int)
     # test
     parser.add_argument('--test_only', action='store_true')
-    parser.add_argument('-tmp', '--test_model_path', default='ckpt/dqn.pth')
+    parser.add_argument('-tmp', '--test_model_path', default='dqn.pth')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--test_episode', default=10, type=int)
     parser.add_argument('--seed', default=20230422, type=int)
     parser.add_argument('--test_epsilon', default=0.01, type=float)
+    parser.add_argument('--resume', default= False, type=float)
     args = parser.parse_args()
 
     ## main ##
@@ -277,9 +281,22 @@ def main():
         agent.load(args.test_model_path)
         test(args, agent, writer)
     else:
+        wandb.init(
+            project = 'Deep Learning Lab6',
+            config = {
+                'Frame': True,
+                'Scale': False,
+                'Others': True,
+                'Resume': False
+            },
+            name = "Testing"
+        )
+        
+        if args.resume:
+            agent.load(args.test_model_path, args.resume)        
         train(args, agent, writer)
         
-
+        wandb.finish()
 
 if __name__ == '__main__':
     main()
