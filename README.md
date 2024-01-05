@@ -6,16 +6,12 @@ This course is lectured by 彭文孝、吳毅成、陳永昇 at NYCU
 
 ## Labs
 
-### [Lab1: BackPropagation](./Lab1/)
-
-### [Lab2: 2048](./Lab2/)
-
-### [Lab3: EEG Classification](./Lab3/)
-
-### [Lab4: Diabetic Retinopathy Detection](./Lab4/)
-
-### [Lab5: Conditional VAE Video Prediction](./Lab5/)
-
-### [Lab6: DQN & DDPG](./Lab6/)
-
-### [Lab7: Let's Play DDPM](./Lab7/)
+|                  Lab                   |          Code          |
+| :------------------------------------: | :--------------------: |
+|         Lab1: BackPropagation          | :link: [link](./Lab1/) |
+|               Lab2: 2048               | :link: [link](./Lab2)  |
+|        Lab3: EEG Classification        | :link: [link](./Lab3)  |
+|  Lab4: Diabetic Retinopathy Detection  | :link: [link](./Lab4)  |
+| Lab5: Conditional VAE Video Prediction | :link: [link](./Lab5)  |
+|            Lab6: DQN & DDPG            | :link: [link](./Lab6)  |
+|         Lab7: Let's Play DDPM          | :link: [link](./Lab7)  |
