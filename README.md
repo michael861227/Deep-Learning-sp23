@@ -4,7 +4,7 @@ This course is lectured by 彭文孝、吳毅成、陳永昇 at NYCU
 
 **Course Information** : [Deep Learning](https://timetable.nycu.edu.tw/?r=main/crsoutline&Acy=112&Sem=2&CrsNo=535507&lang=zh-tw)
 
-## Labs
+## Lab
 
 |                  Lab                   |          Code          |
 | :------------------------------------: | :--------------------: |
