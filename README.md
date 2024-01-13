@@ -1,8 +1,10 @@
 # Deep Learning Spring 2023 @ NYCU
 
-This course is lectured by 彭文孝、吳毅成、陳永昇 at NYCU
+## About This Repository
 
-**Course Information** : [Deep Learning](https://timetable.nycu.edu.tw/?r=main/crsoutline&Acy=112&Sem=2&CrsNo=535507&lang=zh-tw)
+This repository is dedicated to the programming assignment for the Deep Learning course in Spring 2023 at NYCU, lectured by Professors 彭文孝, 吳毅成, and 陳永昇
+
+See more [Deep Learning](https://timetable.nycu.edu.tw/?r=main/crsoutline&Acy=112&Sem=2&CrsNo=535507&lang=zh-tw) course information
 
 <BR>
 
